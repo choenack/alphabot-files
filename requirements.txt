@@ -1,0 +1,7 @@
+requests>=2.31
+pandas>=2.0
+numpy>=1.24
+PyJWT>=2.8
+python-dotenv>=1.0
+anthropic>=2.6
+pytest>=8.0
