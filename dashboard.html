@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="coinai-token" content="__TOKEN__">
+<title>coin ai</title>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --surface-2: #f3f2ef;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11,11,11,0.10);
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --accent: #2a78d6;
+  --up: #006300;
+  --down: #d03b3b;
+  --warn-bg: #fff4dc;
+  --warn-ink: #6b4800;
+  --bad-bg: #fde8e8;
+  --bad-ink: #8a1f1f;
+  --good-dot: #0ca30c;
+  --warn-dot: #fab219;
+  --bad-dot: #d03b3b;
+  --off-dot: #898781;
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --surface-2: #222220; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+    --series-1: #3987e5; --series-2: #d95926; --accent: #3987e5; --up: #0ca30c; --down: #e66767;
+    --warn-bg: #3a2c0a; --warn-ink: #f6d58a; --bad-bg: #3a1515; --bad-ink: #f3b0b0;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19; --surface-2: #222220; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+  --series-1: #3987e5; --series-2: #d95926; --accent: #3987e5; --up: #0ca30c; --down: #e66767;
+  --warn-bg: #3a2c0a; --warn-ink: #f6d58a; --bad-bg: #3a1515; --bad-ink: #f3b0b0;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--page); color: var(--ink);
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", "Malgun Gothic", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, select { font: inherit; color: inherit; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 0 16px 48px; }
+
+/* 상단 바 */
+.top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 0 10px; }
+.brand { font-size: 18px; font-weight: 650; letter-spacing: -0.01em; margin-right: 4px; }
+.pill { display: inline-flex; align-items: center; gap: 7px; padding: 4px 10px; border-radius: 999px;
+  background: var(--surface); border: 1px solid var(--border); font-weight: 560; font-size: 13px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--off-dot); flex: none; }
+.dot.running { background: var(--good-dot); } .dot.paused { background: var(--warn-dot); }
+.dot.halted { background: var(--bad-dot); } .dot.off { background: var(--off-dot); }
+.meta { color: var(--muted); font-size: 12.5px; }
+.spacer { flex: 1; }
+.btn { border: 1px solid var(--border); background: var(--surface); padding: 6px 12px; border-radius: 8px;
+  cursor: pointer; font-size: 13px; font-weight: 520; white-space: nowrap; }
+.btn:hover { background: var(--surface-2); }
+.btn:focus-visible, .tab:focus-visible, .seg button:focus-visible, svg:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn.primary { background: var(--accent); border-color: transparent; color: #fff; }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.danger { color: var(--down); }
+.btn.small { padding: 3px 9px; font-size: 12px; }
+.btn:disabled { opacity: .5; cursor: default; }
+
+/* 알림 띠 */
+.banner { display: none; margin: 4px 0 10px; padding: 10px 14px; border-radius: var(--radius);
+  background: var(--warn-bg); color: var(--warn-ink); font-weight: 520; align-items: center; gap: 10px; flex-wrap: wrap; }
+.banner.show { display: flex; }
+.banner.bad { background: var(--bad-bg); color: var(--bad-ink); }
+
+/* 탭 */
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin: 6px 0 16px; overflow-x: auto; }
+.tab { background: none; border: 0; padding: 9px 14px; cursor: pointer; color: var(--ink-2); font-weight: 540;
+  border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+.tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); }
+.panel { display: none; } .panel.active { display: block; }
+
+/* 카드 */
+.grid { display: grid; gap: 12px; }
+.kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 12px; }
+@media (min-width: 640px) { .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 1000px) { .kpis { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+.kpis.four { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 900px) { .kpis.four { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; min-width: 0; }
+.card h2 { font-size: 14px; font-weight: 620; margin: 0 0 2px; }
+.card .sub { color: var(--muted); font-size: 12.5px; margin: 0 0 10px; }
+.tile .label { color: var(--ink-2); font-size: 12.5px; }
+.tile .value { font-size: 22px; font-weight: 620; letter-spacing: -0.01em; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.arr { font-size: .62em; vertical-align: .12em; margin-right: .25em; }
+.tile .delta { font-size: 12.5px; margin-top: 2px; color: var(--ink-2); }
+.tile.hero { grid-column: 1 / -1; display: flex; flex-direction: column; justify-content: center; }
+.tile.hero .value { font-size: 40px; line-height: 1.15; }
+@media (min-width: 1000px) { .tile.hero { grid-column: span 2; grid-row: span 2; } .tile.hero .value { font-size: 44px; } }
+@media (max-width: 520px) { .tile.hero .value { font-size: 32px; } }
+.up { color: var(--up); } .down { color: var(--down); }
+.two { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+@media (max-width: 900px) { .two { grid-template-columns: minmax(0, 1fr); } }
+.stack { display: grid; gap: 12px; }
+
+/* 차트 */
+.chart-head { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.seg button { border: 0; background: none; padding: 4px 11px; cursor: pointer; font-size: 12.5px; color: var(--ink-2); }
+.seg button[aria-pressed="true"] { background: var(--surface-2); color: var(--ink); font-weight: 600; }
+.legend { display: flex; gap: 14px; color: var(--ink-2); font-size: 12.5px; align-items: center; }
+.lkey { display: inline-block; width: 16px; height: 2px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+.chart-box { position: relative; width: 100%; }
+.chart-box svg { display: block; width: 100%; overflow: visible; }
+.chart-box.loading svg { opacity: .55; }
+.tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 10px; font-size: 12.5px; box-shadow: 0 4px 16px rgba(0,0,0,.08); display: none; min-width: 150px; z-index: 2; }
+.tip .t { color: var(--muted); margin-bottom: 4px; }
+.tip .row { display: flex; align-items: center; gap: 8px; }
+.tip .row b { font-weight: 650; font-variant-numeric: tabular-nums; }
+.tip .row span { color: var(--ink-2); }
+.empty { color: var(--muted); padding: 40px 0; text-align: center; }
+details.tv { margin-top: 8px; color: var(--ink-2); font-size: 12.5px; }
+details.tv summary { cursor: pointer; }
+
+/* 표 */
+.tbl-wrap { overflow-x: auto; margin: 0 -4px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; color: var(--muted); font-weight: 520; font-size: 12px; padding: 6px 8px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+td { padding: 7px 8px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+tr:last-child td { border-bottom: 0; }
+.tag { display: inline-block; padding: 1px 7px; border-radius: 6px; background: var(--surface-2); font-size: 12px; color: var(--ink-2); }
+.tag.enter { background: rgba(42,120,214,.14); color: var(--ink); }
+.muted { color: var(--muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-size: 13px; }
+.kv dt { color: var(--ink-2); } .kv dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+
+/* 설정 */
+.form { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px 16px; }
+.field label { display: block; font-size: 12.5px; color: var(--ink-2); margin-bottom: 4px; }
+.field input, .field select { width: 100%; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--page); }
+.field .hint { font-size: 12px; color: var(--muted); margin-top: 3px; }
+.set { color: var(--up); font-weight: 600; } .unset { color: var(--down); font-weight: 600; }
+pre.log { margin: 0; max-height: 65vh; overflow: auto; font: 12px/1.55 ui-monospace, "Cascadia Mono", Consolas, monospace;
+  white-space: pre-wrap; word-break: break-all; color: var(--ink-2); }
+.toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--ink); color: var(--page);
+  padding: 9px 16px; border-radius: 10px; font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: calc(100% - 32px); z-index: 10; }
+.toast.show { opacity: 1; }
+.lines { margin: 8px 0 0; padding: 0; list-style: none; font-size: 13px; }
+.lines li { padding: 3px 0; border-bottom: 1px solid var(--grid); word-break: break-all; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <span class="brand">coin ai</span>
+    <span class="pill" id="status"><span class="dot off" id="statusDot"></span><span id="statusLabel">연결 중…</span></span>
+    <span class="meta" id="scanMeta"></span>
+    <span class="spacer"></span>
+    <button class="btn" id="btnPause" type="button">신규 진입 일시정지</button>
+    <button class="btn" id="btnEngine" type="button">엔진 끄기</button>
+    <button class="btn" id="btnTheme" type="button" aria-label="화면 테마 바꾸기">테마: 자동</button>
+    <button class="btn danger" id="btnExit" type="button">종료</button>
+  </header>
+
+  <div class="banner" id="banner"><span id="bannerText"></span><span class="spacer"></span><span id="bannerAct"></span></div>
+
+  <nav class="tabs" role="tablist" aria-label="화면">
+    <button class="tab" role="tab" aria-selected="true" data-tab="overview" type="button">개요</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="trades" type="button">매매 기록</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="decisions" type="button">판단 기록</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="settings" type="button">설정</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="logs" type="button">로그</button>
+  </nav>
+
+  <!-- 개요 -->
+  <section class="panel active" id="tab-overview" role="tabpanel">
+    <div class="grid kpis" id="kpis"></div>
+    <div class="card" style="margin-bottom:12px">
+      <h2>보유·대기</h2>
+      <p class="sub" id="posSub">봇이 산 코인만 보여요(직접 산 코인은 건드리지 않아요)</p>
+      <div class="tbl-wrap"><table id="posTable"></table></div>
+    </div>
+    <div class="grid two">
+      <div class="stack">
+        <div class="card">
+          <div class="chart-head">
+            <div>
+              <h2>자산 vs BTC 보유</h2>
+              <p class="sub">시작 시점을 100으로 맞춘 비교 · 10분마다 기록</p>
+            </div>
+            <span class="spacer"></span>
+            <div class="seg" id="range" role="group" aria-label="기간">
+              <button type="button" data-days="1" aria-pressed="false">1일</button>
+              <button type="button" data-days="7" aria-pressed="true">7일</button>
+              <button type="button" data-days="30" aria-pressed="false">30일</button>
+              <button type="button" data-days="all" aria-pressed="false">전체</button>
+            </div>
+          </div>
+          <div class="legend"><span><i class="lkey" style="background:var(--series-1)"></i>봇 자산</span><span><i class="lkey" style="background:var(--series-2)"></i>BTC 보유</span></div>
+          <div class="chart-box" id="chartBox"><div class="tip" id="tip" role="status"></div></div>
+          <details class="tv"><summary>표로 보기</summary><div class="tbl-wrap"><table id="eqTable"></table></div></details>
+        </div>
+      </div>
+      <div class="stack">
+        <div class="card">
+          <h2>시장</h2>
+          <p class="sub">BTC 상태에 따라 진입 크기가 달라져요</p>
+          <dl class="kv" id="market"></dl>
+        </div>
+        <div class="card">
+          <h2>최근 스캔 셋업</h2>
+          <p class="sub" id="setupSub">코드가 찾은 자리 → LLM 판단</p>
+          <div class="tbl-wrap"><table id="setupTable"></table></div>
+        </div>
+        <div class="card">
+          <h2>감시 코인</h2>
+          <p class="sub">24시간 거래대금 상위 · 1시간마다 갱신</p>
+          <div class="chips" id="universe"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 매매 기록 -->
+  <section class="panel" id="tab-trades" role="tabpanel">
+    <div class="grid kpis four" id="tradeKpis"></div>
+    <div class="card"><h2>청산된 매매</h2><p class="sub">최근 30건 · R = 진입가에서 손절가까지 거리 기준 손익</p>
+      <div class="tbl-wrap"><table id="tradeTable"></table></div></div>
+  </section>
+
+  <!-- 판단 기록 -->
+  <section class="panel" id="tab-decisions" role="tabpanel">
+    <div class="grid two">
+      <div class="card"><h2>LLM 판단</h2><p class="sub">최근 40건 · 섀도 = 새 프롬프트 비교용(주문 안 함)</p>
+        <div class="tbl-wrap"><table id="decTable"></table></div></div>
+      <div class="card"><h2>자가진화</h2><p class="sub">한 달에 한 번 새 프롬프트를 만들고 2주 비교 후 더 나을 때만 교체</p>
+        <dl class="kv" id="promptKv"></dl>
+        <p class="sub" id="shadowChanges" style="margin-top:10px"></p>
+        <button class="btn" id="btnEvolve" type="button">지금 자가진화 실행</button></div>
+    </div>
+  </section>
+
+  <!-- 설정 -->
+  <section class="panel" id="tab-settings" role="tabpanel">
+    <div class="stack">
+      <div class="card">
+        <h2>API 키</h2>
+        <p class="sub">값은 이 PC의 .env 파일에만 저장되고 화면에 다시 보이지 않아요. 바꿀 때만 입력하세요.</p>
+        <div class="form" id="keyForm"></div>
+      </div>
+      <div class="card">
+        <h2>매매 설정</h2>
+        <p class="sub">비율은 소수로 입력(0.03 = 3%). 저장하면 바로 적용돼요.</p>
+        <div class="form" id="paramForm"></div>
+      </div>
+      <div><button class="btn primary" id="btnSave" type="button">저장하고 적용</button></div>
+      <div class="card">
+        <h2>점검</h2>
+        <p class="sub">키·IP·잔고·감시 대상·셋업·LLM 연결을 확인해요(주문 안 함, LLM 1회 호출)</p>
+        <button class="btn" id="btnCheck" type="button">점검 실행</button>
+        <ul class="lines" id="checkOut"></ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 로그 -->
+  <section class="panel" id="tab-logs" role="tabpanel">
+    <div class="card"><h2>실행 로그</h2><p class="sub">최근 300줄 · 파일 전체는 coinai.log</p><pre class="log" id="log"></pre></div>
+  </section>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+"use strict";
+const TOKEN = document.querySelector('meta[name="coinai-token"]').content;
+const $ = (id) => document.getElementById(id);
+let S = null, days = "7", eqData = [], activeTab = "overview";
+
+// ── 공통 ─────────────────────────────────────────────
+function el(tag, attrs, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v == null || v === false) continue;
+    if (k === "class") e.className = v; else if (k === "text") e.textContent = v;
+    else if (k.startsWith("on")) e.addEventListener(k.slice(2), v); else e.setAttribute(k, v);
+  }
+  for (const c of kids.flat()) if (c != null) e.append(c instanceof Node ? c : document.createTextNode(String(c)));
+  return e;
+}
+async function api(path, body) {
+  const opt = { headers: { "X-Token": TOKEN } };
+  if (body !== undefined) { opt.method = "POST"; opt.headers["Content-Type"] = "application/json"; opt.body = JSON.stringify(body); }
+  const r = await fetch(path, opt);
+  const j = await r.json().catch(() => ({ ok: false, error: "응답 오류" }));
+  if (!r.ok && j.ok === undefined) j.ok = false;
+  return j;
+}
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove("show"), 3500); }
+async function act(name, body, confirmMsg) {
+  if (confirmMsg && !confirm(confirmMsg)) return null;
+  const r = await api("/api/" + name, body || {});
+  toast(r.ok ? (r.msg || "완료") : ("실패: " + (r.error || "알 수 없음")));
+  refresh();
+  return r;
+}
+const nf = new Intl.NumberFormat("ko-KR");
+const won = (v) => v == null ? "—" : nf.format(Math.round(v)) + "원";
+const sgn = (v) => v > 0 ? "+" : v < 0 ? "−" : "";
+const swon = (v) => v == null ? "—" : sgn(v) + nf.format(Math.abs(Math.round(v))) + "원";
+const spct = (v, d = 2) => v == null ? "—" : sgn(v) + Math.abs(v).toFixed(d) + "%";
+const cls = (v) => v > 0 ? "up" : v < 0 ? "down" : "";
+function price(v) { if (v == null) return "—"; v = +v; return v >= 100 ? nf.format(Math.round(v)) : v >= 1 ? v.toFixed(2) : String(+v.toPrecision(5)); }
+function ago(ts) { if (!ts) return "—"; const s = Date.now() / 1000 - ts; if (s < 60) return "방금"; if (s < 3600) return Math.floor(s / 60) + "분 전"; if (s < 86400) return Math.floor(s / 3600) + "시간 전"; return Math.floor(s / 86400) + "일 전"; }
+function hm(ts) { if (!ts) return "—"; const d = new Date(ts * 1000); return d.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }); }
+function dt(ts) { if (!ts) return "—"; const d = new Date(ts * 1000); return (d.getMonth() + 1) + "/" + d.getDate() + " " + hm(ts); }
+function dur(ts) { if (!ts) return "—"; const h = (Date.now() / 1000 - ts) / 3600; return h < 1 ? Math.round(h * 60) + "분" : h < 48 ? h.toFixed(1) + "시간" : (h / 24).toFixed(1) + "일"; }
+const coin = (m) => (m || "").replace("KRW-", "");
+const SETUP = { BREAKOUT: "돌파", PULLBACK: "눌림목" };
+const REGIME = { UP: "상승", SIDE: "횡보", DOWN: "하락" };
+const EXIT = { stop: "손절", trail: "트레일링", time: "시간 손절", manual: "수동", external: "외부 매도", dust: "먼지" };
+const STATUS = { pending_entry: "진입 대기", open: "보유", pending_exit: "청산 중" };
+function table(t, head, rows, emptyMsg) {
+  t.replaceChildren();
+  t.append(el("thead", {}, el("tr", {}, head.map(([h, n]) => el("th", { class: n ? "num" : null, text: h })))));
+  const tb = el("tbody");
+  if (!rows.length) tb.append(el("tr", {}, el("td", { colspan: head.length, class: "muted", text: emptyMsg })));
+  rows.forEach((r) => tb.append(el("tr", {}, r.map((c, i) => c instanceof Node ? el("td", { class: head[i][1] ? "num" : null }, c) : el("td", { class: head[i][1] ? "num" : null, text: c ?? "—" })))));
+  t.append(tb);
+}
+function signed(v, txt) { return el("span", { class: cls(v) }, v ? el("span", { class: "arr", "aria-hidden": "true", text: v > 0 ? "▲" : "▼" }) : null, txt); }
+
+// ── 테마 ─────────────────────────────────────────────
+const THEMES = ["auto", "light", "dark"], TNAME = { auto: "자동", light: "밝게", dark: "어둡게" };
+function applyTheme(t) {
+  if (t === "auto") document.documentElement.removeAttribute("data-theme"); else document.documentElement.setAttribute("data-theme", t);
+  $("btnTheme").textContent = "테마: " + TNAME[t];
+  drawChart();
+}
+let theme = "auto";
+try { theme = localStorage.getItem("coinai-theme") || "auto"; } catch (e) {}
+$("btnTheme").addEventListener("click", () => { theme = THEMES[(THEMES.indexOf(theme) + 1) % 3]; try { localStorage.setItem("coinai-theme", theme); } catch (e) {} applyTheme(theme); });
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => drawChart());
+
+// ── 탭 ───────────────────────────────────────────────
+document.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
+function showTab(name) {
+  activeTab = name;
+  document.querySelectorAll(".tab").forEach((b) => b.setAttribute("aria-selected", b.dataset.tab === name ? "true" : "false"));
+  document.querySelectorAll(".panel").forEach((p) => p.classList.toggle("active", p.id === "tab-" + name));
+  if (name === "overview") drawChart();
+  if (name === "logs") loadLogs();
+}
+
+// ── 상단·알림 ────────────────────────────────────────
+function renderTop() {
+  $("statusDot").className = "dot " + S.status;
+  $("statusLabel").textContent = S.status_label;
+  const parts = [];
+  if (S.last_scan) parts.push("마지막 스캔 " + ago(S.last_scan));
+  if (S.next_scan && S.status !== "off") parts.push("다음 " + hm(S.next_scan));
+  $("scanMeta").textContent = parts.join(" · ");
+  const paused = S.flags.entries_paused;
+  $("btnPause").textContent = paused ? "신규 진입 재개" : "신규 진입 일시정지";
+  const on = S.status !== "off";
+  $("btnEngine").textContent = on ? "엔진 끄기" : "엔진 켜기";
+  const b = $("banner"), bt = $("bannerText"), ba = $("bannerAct");
+  ba.replaceChildren(); b.className = "banner";
+  if (S.flags.halted) {
+    b.classList.add("show", "bad"); bt.textContent = "누적 손실 한도에 닿아 신규 진입을 멈췄어요. 보유분 손절 감시는 계속돼요.";
+    ba.append(el("button", { class: "btn small", type: "button", text: "정지 해제", onclick: () => act("reset_halt", {}, "정지를 해제하고 다시 매매할까요?") }));
+  } else if (!on) {
+    b.classList.add("show"); bt.textContent = S.engine_msg || "엔진이 꺼져 있어요.";
+    if (!S.settings.keys.upbit || !(S.settings.keys.deepseek || S.settings.keys.anthropic))
+      ba.append(el("button", { class: "btn small", type: "button", text: "설정 열기", onclick: () => showTab("settings") }));
+    else ba.append(el("button", { class: "btn small", type: "button", text: "엔진 켜기", onclick: () => act("engine", { action: "start" }) }));
+  } else if (S.flags.daily_limit_hit) {
+    b.classList.add("show"); bt.textContent = "오늘 손실 한도에 닿아 오늘은 신규 진입을 안 해요(내일 자동 재개).";
+  } else if (S.flags.pause_until > S.now) {
+    b.classList.add("show"); bt.textContent = "BTC 급락으로 " + hm(S.flags.pause_until) + "까지 신규 진입을 쉬어요.";
+  }
+}
+$("btnPause").addEventListener("click", () => act("pause", { paused: !S.flags.entries_paused }));
+$("btnEngine").addEventListener("click", () => S.status === "off" ? act("engine", { action: "start" })
+  : act("engine", { action: "stop" }, "엔진을 끄면 보유 코인의 손절 감시도 멈춰요. 끌까요?"));
+$("btnExit").addEventListener("click", async () => {
+  const r = await act("shutdown", {}, "프로그램을 종료할까요? 보유 코인의 손절 감시도 멈춰요.");
+  if (r && r.ok) setTimeout(() => { document.body.replaceChildren(el("div", { class: "wrap" }, el("p", { class: "empty", text: "coin ai를 종료했어요. 이 창을 닫아도 돼요." }))); }, 600);
+});
+
+// ── 개요 ─────────────────────────────────────────────
+function tile(label, value, delta, hero) {
+  return el("div", { class: "card tile" + (hero ? " hero" : "") }, el("div", { class: "label", text: label }),
+    el("div", { class: "value" }, value), delta ? el("div", { class: "delta" }, delta) : null);
+}
+function renderKpis() {
+  const k = S.kpi, tot = k.equity - k.start_capital, totPct = k.start_capital ? tot / k.start_capital * 100 : 0;
+  const pf = k.pf_inf_7d ? "∞" : k.pf_7d == null ? "—" : k.pf_7d.toFixed(2);
+  $("kpis").replaceChildren(
+    tile("봇 자산", won(k.equity), el("span", {}, signed(tot, swon(tot) + " (" + spct(totPct) + ")"), " 시작금 " + won(k.start_capital) + " 대비"), true),
+    tile("오늘 손익", signed(k.today_pnl, swon(k.today_pnl)), spct(k.today_pct) + " · 하루 한도 −" + Math.round(S.settings.values.DAILY_LOSS_LIMIT * 100) + "%"),
+    tile("실현 손익(누적)", signed(k.realized, swon(k.realized)), "매매 " + k.trades_all + "회 · 수수료 " + won(k.fees)),
+    tile("승률(7일)", k.trades_7d ? k.win_rate_7d.toFixed(0) + "%" : "—", "매매 " + k.trades_7d + "회 · 연속 손절 " + k.loss_streak),
+    tile("총이익÷총손실(7일)", pf, "평균 " + (k.avg_win_r >= 0 ? "+" : "") + k.avg_win_r + "R / " + k.avg_loss_r + "R"),
+    tile("원화 잔고", won(S.krw_free), "봇 현금 " + won(k.cash)),
+    tile("LLM 비용(이번 달)", won(k.llm_month_krw), S.settings.model),
+  );
+}
+function renderPositions() {
+  const rows = S.positions.map((p) => {
+    const actBtn = p.status === "open" ? el("button", { class: "btn small danger", type: "button", text: "청산", onclick: () => act("close", { id: p.id }, coin(p.market) + "을(를) 지금 시장가로 청산할까요?") })
+      : p.status === "pending_entry" && p.entry_type === "limit" ? el("button", { class: "btn small", type: "button", text: "취소", onclick: () => act("cancel", { id: p.id }, coin(p.market) + " 대기 주문을 취소할까요?") }) : el("span", { class: "muted", text: "—" });
+    const isOpen = p.status !== "pending_entry";
+    return [
+      el("span", {}, el("b", { text: coin(p.market) }), " ", el("span", { class: "tag", text: SETUP[p.setup] || p.setup })),
+      el("span", {}, STATUS[p.status] || p.status, el("span", { class: "muted", text: " · " + (isOpen ? dur(p.opened_at) : dur(p.created_at)) })),
+      isOpen ? price(p.entry_price) : "지정가 " + price(p.limit_price),
+      price(p.price),
+      isOpen && p.pnl_pct != null ? signed(p.pnl_pct, spct(p.pnl_pct)) : "—",
+      isOpen && p.pnl_krw != null ? signed(p.pnl_krw, swon(p.pnl_krw)) : won(p.budget_krw),
+      isOpen ? el("span", {}, price(p.stop_price) + (p.stop_dist_pct != null ? " (" + spct(p.stop_dist_pct, 1) + ")" : ""),
+        el("span", { class: "muted", text: p.be_moved ? " · 트레일링" : " · 초기" })) : el("span", { class: "muted", text: "만료 " + hm(p.expires_at > 0 ? p.expires_at : null) }),
+      actBtn,
+    ];
+  });
+  $("posSub").textContent = "봇이 산 코인만 보여요 · 동시 보유 최대 " + S.settings.values.MAX_POSITIONS + "개";
+  table($("posTable"), [["코인"], ["상태"], ["진입가", 1], ["현재가", 1], ["수익률", 1], ["평가손익", 1], ["손절선", 1], [""]], rows, "보유 중인 코인이 없어요");
+}
+function renderMarket() {
+  const b = S.btc, kv = $("market"); kv.replaceChildren();
+  const add = (k, v) => kv.append(el("dt", { text: k }), el("dd", {}, v));
+  add("BTC 상태", b ? REGIME[b.regime] || b.regime : "—");
+  add("BTC 24시간", b ? signed(b.ret24, spct(b.ret24)) : "—");
+  add("BTC 7일", b ? signed(b.ret7d, spct(b.ret7d)) : "—");
+  add("BTC 가격", b && b.price ? won(b.price) : "—");
+  add("진입 크기", b ? (b.regime === "UP" ? "100%" : b.regime === "SIDE" ? "70%" : "BTC보다 강한 코인만 70%") : "—");
+  const sets = S.setups.map((s) => [coin(s.market), SETUP[s.setup] || s.setup, "−" + s.stop_pct + "%", spct(s.rs24, 1),
+    s.action ? el("span", { class: "tag" + (s.action === "ENTER" ? " enter" : ""), text: s.action === "ENTER" ? "진입" : "패스" }) : el("span", { class: "muted", text: "미판단" })]);
+  $("setupSub").textContent = S.last_scan ? hm(S.last_scan) + " 스캔 · 셋업 " + S.setups.length + "개" : "아직 스캔 전";
+  table($("setupTable"), [["코인"], ["셋업"], ["손절", 1], ["BTC 대비", 1], ["LLM"]], sets, "이번 스캔엔 셋업이 없어요");
+  $("universe").replaceChildren(...(S.universe.length ? S.universe.map((m) => el("span", { class: "tag", text: coin(m) })) : [el("span", { class: "muted", text: "엔진이 켜지면 표시돼요" })]));
+}
+
+// ── 차트(인라인 SVG) ─────────────────────────────────
+const NS = "http://www.w3.org/2000/svg";
+function svg(tag, attrs) { const e = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); return e; }
+function niceStep(range, n) { const raw = range / n, p = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / p; return (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * p; }
+function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+async function loadEquity() {
+  $("chartBox").classList.add("loading");
+  const r = await api("/api/equity?days=" + days);
+  eqData = (r.points || []).filter((p) => p.eq > 0);
+  $("chartBox").classList.remove("loading");
+  drawChart(); renderEqTable();
+}
+function series() {
+  if (eqData.length < 2) return null;
+  const b0 = eqData.find((p) => p.btc), e0 = eqData[0].eq;
+  return eqData.map((p) => ({ t: p.t, eq: p.eq, bot: p.eq / e0 * 100, btc: b0 && p.btc ? p.btc / b0.btc * 100 : null }));
+}
+function drawChart() {
+  const box = $("chartBox"), tip = $("tip");
+  box.querySelectorAll("svg, .empty").forEach((n) => n.remove());
+  if (activeTab !== "overview") return;
+  const data = series();
+  if (!data) { box.append(el("div", { class: "empty", text: "아직 그릴 데이터가 없어요 — 엔진이 켜지면 10분마다 자산을 기록해요" })); return; }
+  const W = Math.max(280, box.clientWidth), H = W < 520 ? 220 : 260, m = { l: 46, r: W < 520 ? 12 : 84, t: 10, b: 26 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const vals = data.flatMap((d) => [d.bot, d.btc]).filter((v) => v != null);
+  let lo = Math.min(...vals, 100), hi = Math.max(...vals, 100);
+  if (hi - lo < 1) { lo -= 0.5; hi += 0.5; }
+  const step = niceStep(hi - lo, 4); lo = Math.floor(lo / step) * step; hi = Math.ceil(hi / step) * step;
+  const t0 = data[0].t, t1 = data[data.length - 1].t;
+  const x = (t) => m.l + (t1 === t0 ? 0 : (t - t0) / (t1 - t0) * iw), y = (v) => m.t + (hi - v) / (hi - lo) * ih;
+  const g = svg("svg", { viewBox: `0 0 ${W} ${H}`, height: H, tabindex: "0", role: "img",
+    "aria-label": `봇 자산 지수 ${data[data.length - 1].bot.toFixed(1)}, BTC 보유 지수 ${data[data.length - 1].btc?.toFixed(1) ?? "없음"} (시작 100)` });
+  const grid = css("--grid"), muted = css("--muted"), axis = css("--axis"), surf = css("--surface"), ink2 = css("--ink-2");
+  for (let v = lo; v <= hi + 1e-9; v += step) {
+    g.append(svg("line", { x1: m.l, x2: W - m.r, y1: y(v), y2: y(v), stroke: Math.abs(v - 100) < 1e-9 ? axis : grid, "stroke-width": 1, "shape-rendering": "crispEdges" }));
+    const tx = svg("text", { x: m.l - 8, y: y(v) + 4, "text-anchor": "end", fill: muted, "font-size": 11, style: "font-variant-numeric:tabular-nums" });
+    tx.textContent = step < 1 ? v.toFixed(1) : String(Math.round(v)); g.append(tx);
+  }
+  const span = t1 - t0, nT = W < 520 ? 3 : 5;
+  for (let i = 0; i <= nT; i++) {
+    const t = t0 + span * i / nT, d = new Date(t * 1000);
+    const lab = span < 2 * 86400 ? hm(t) : (d.getMonth() + 1) + "/" + d.getDate();
+    const tx = svg("text", { x: x(t), y: H - 6, "text-anchor": i === 0 ? "start" : i === nT ? "end" : "middle", fill: muted, "font-size": 11 });
+    tx.textContent = lab; g.append(tx);
+  }
+  const line = (key, color) => {
+    const pts = data.filter((d) => d[key] != null);
+    if (pts.length < 2) return null;
+    g.append(svg("path", { d: pts.map((d, i) => (i ? "L" : "M") + x(d.t).toFixed(1) + " " + y(d[key]).toFixed(1)).join(""),
+      fill: "none", stroke: color, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+    const last = pts[pts.length - 1];
+    g.append(svg("circle", { cx: x(last.t), cy: y(last[key]), r: 4, fill: color, stroke: surf, "stroke-width": 2 }));
+    return last;
+  };
+  const c1 = css("--series-1"), c2 = css("--series-2");
+  const lb = line("btc", c2), lbot = line("bot", c1);
+  // 끝 라벨: 두 선이 가까우면 겹쳐 쓰지 않고 범례·툴팁에 맡긴다
+  if (m.r > 40 && lbot) {
+    const ends = [["봇", lbot.bot], ["BTC", lb ? lb.btc : null]].filter((e) => e[1] != null);
+    const close = ends.length === 2 && Math.abs(y(ends[0][1]) - y(ends[1][1])) < 16;
+    if (!close) ends.forEach(([name, v]) => {
+      const tx = svg("text", { x: W - m.r + 10, y: y(v) + 4, fill: ink2, "font-size": 12 });
+      tx.textContent = name + " " + spct(v - 100, 1); g.append(tx);
+    });
+  }
+  const cross = svg("line", { y1: m.t, y2: m.t + ih, stroke: axis, "stroke-width": 1, visibility: "hidden" });
+  const hb = svg("circle", { r: 4, fill: c1, stroke: surf, "stroke-width": 2, visibility: "hidden" });
+  const hc = svg("circle", { r: 4, fill: c2, stroke: surf, "stroke-width": 2, visibility: "hidden" });
+  const hit = svg("rect", { x: m.l, y: m.t, width: iw, height: ih, fill: "transparent" });
+  g.append(cross, hc, hb, hit);
+  box.append(g);
+  let idx = data.length - 1;
+  const show = (i) => {
+    idx = Math.max(0, Math.min(data.length - 1, i));
+    const d = data[idx], px = x(d.t);
+    cross.setAttribute("x1", px); cross.setAttribute("x2", px); cross.setAttribute("visibility", "visible");
+    hb.setAttribute("cx", px); hb.setAttribute("cy", y(d.bot)); hb.setAttribute("visibility", "visible");
+    if (d.btc != null) { hc.setAttribute("cx", px); hc.setAttribute("cy", y(d.btc)); hc.setAttribute("visibility", "visible"); } else hc.setAttribute("visibility", "hidden");
+    tip.replaceChildren(el("div", { class: "t", text: dt(d.t) }),
+      el("div", { class: "row" }, el("i", { class: "lkey", style: "background:var(--series-1)" }), el("b", { text: won(d.eq) }), el("span", { text: "봇 " + spct(d.bot - 100, 1) })),
+      el("div", { class: "row" }, el("i", { class: "lkey", style: "background:var(--series-2)" }), el("b", { text: d.btc != null ? spct(d.btc - 100, 1) : "—" }), el("span", { text: "BTC 보유" })));
+    tip.style.display = "block";
+    const scale = box.clientWidth / W, tw = tip.offsetWidth;
+    let left = px * scale + 12; if (left + tw > box.clientWidth) left = px * scale - tw - 12;
+    tip.style.left = Math.max(0, left) + "px"; tip.style.top = (m.t + 4) + "px";
+  };
+  const hide = () => { [cross, hb, hc].forEach((n) => n.setAttribute("visibility", "hidden")); tip.style.display = "none"; };
+  hit.addEventListener("pointermove", (ev) => {
+    const r = g.getBoundingClientRect(), vx = (ev.clientX - r.left) * (W / r.width);
+    let best = 0, bd = Infinity; data.forEach((d, i) => { const dd = Math.abs(x(d.t) - vx); if (dd < bd) { bd = dd; best = i; } });
+    show(best);
+  });
+  hit.addEventListener("pointerleave", hide);
+  g.addEventListener("focus", () => show(idx));
+  g.addEventListener("blur", hide);
+  g.addEventListener("keydown", (ev) => {
+    if (ev.key === "ArrowLeft") { show(idx - 1); ev.preventDefault(); }
+    else if (ev.key === "ArrowRight") { show(idx + 1); ev.preventDefault(); }
+    else if (ev.key === "Escape") hide();
+  });
+}
+function renderEqTable() {
+  const data = series() || [], stepN = Math.max(1, Math.ceil(data.length / 40));
+  const rows = data.filter((_, i) => i % stepN === 0 || i === data.length - 1).reverse()
+    .map((d) => [dt(d.t), won(d.eq), (d.bot - 100 >= 0 ? "+" : "") + (d.bot - 100).toFixed(2) + "%", d.btc != null ? (d.btc - 100 >= 0 ? "+" : "") + (d.btc - 100).toFixed(2) + "%" : "—"]);
+  table($("eqTable"), [["시각"], ["봇 자산", 1], ["봇 변화", 1], ["BTC 변화", 1]], rows, "데이터 없음");
+}
+document.querySelectorAll("#range button").forEach((b) => b.addEventListener("click", () => {
+  days = b.dataset.days;
+  document.querySelectorAll("#range button").forEach((x) => x.setAttribute("aria-pressed", x === b ? "true" : "false"));
+  loadEquity();
+}));
+let rz; addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(drawChart, 120); });
+
+// ── 매매·판단 ────────────────────────────────────────
+function renderTrades() {
+  const k = S.kpi;
+  $("tradeKpis").replaceChildren(
+    tile("전체 매매", String(k.trades_all), "승률 " + (k.trades_all ? k.win_rate_all.toFixed(0) + "%" : "—")),
+    tile("실현 손익", signed(k.realized, swon(k.realized)), "수수료 " + won(k.fees) + " 포함"),
+    tile("최대 낙폭", k.mdd_all.toFixed(1) + "%", "자산 고점 대비"),
+    tile("운용금", won(k.allocation), "시작 " + won(k.start_capital) + " + 실현 손익"));
+  table($("tradeTable"), [["청산"], ["코인"], ["셋업"], ["진입가", 1], ["청산가", 1], ["손익", 1], ["R", 1], ["사유"], ["보유", 1]],
+    S.trades.map((t) => [dt(t.closed_at), coin(t.market), SETUP[t.setup] || t.setup, price(t.entry_price), price(t.exit_price),
+      signed(t.pnl_krw, swon(t.pnl_krw)), signed(t.pnl_r, (t.pnl_r >= 0 ? "+" : "") + (t.pnl_r ?? 0).toFixed(2) + "R"), EXIT[t.exit_reason] || t.exit_reason || "—",
+      t.opened_at ? ((t.closed_at - t.opened_at) / 3600).toFixed(1) + "시간" : "—"]), "아직 청산된 매매가 없어요");
+}
+function renderDecisions() {
+  table($("decTable"), [["시각"], ["코인"], ["셋업"], ["판단"], ["확신"], ["근거"], ["모델"], ["24h 후", 1]],
+    S.decisions.map((d) => [dt(d.ts), coin(d.market), SETUP[d.setup] || d.setup,
+      el("span", { class: "tag" + (d.action === "ENTER" ? " enter" : ""), text: (d.action === "ENTER" ? "진입" : "패스") + (d.is_shadow ? " · 섀도" : "") }),
+      d.conviction === "high" ? "높음" : "보통", d.error ? "실패: " + d.error.slice(0, 40) : d.reason, (d.model || "").replace("claude-", ""),
+      d.fwd_24h != null ? signed(d.fwd_24h, spct(d.fwd_24h, 1)) : el("span", { class: "muted", text: "대기" })]), "아직 판단 기록이 없어요");
+  const p = S.prompt, kv = $("promptKv"); kv.replaceChildren();
+  const add = (k, v) => kv.append(el("dt", { text: k }), el("dd", { text: v }));
+  add("사용 중 프롬프트", "v" + p.version);
+  add("셋업당 기대 R", (p.score >= 0 ? "+" : "") + p.score.toFixed(3) + " (결과 " + p.samples + "개)");
+  add("비교 중", p.shadow ? "v" + p.shadow.version + " · " + ago(p.shadow.since) + " 시작" : "없음");
+  add("마지막 진화", p.last_evolve ? dt(p.last_evolve) : "아직 없음");
+  $("shadowChanges").textContent = p.shadow && p.shadow.changes ? "바뀐 점: " + p.shadow.changes : "";
+  const b = $("btnEvolve"); b.disabled = !!p.evolving || !S.settings.keys.anthropic;
+  b.textContent = p.evolving ? "진화 중…" : S.settings.keys.anthropic ? "지금 자가진화 실행" : "Claude 키가 있어야 해요";
+}
+$("btnEvolve").addEventListener("click", () => act("evolve", {}, "Fable 5.1로 지금 새 프롬프트를 만들까요? (한 번에 수백~수천 원)"));
+
+// ── 설정 ─────────────────────────────────────────────
+const KEYS = [["UPBIT_ACCESS_KEY", "업비트 Access Key", "upbit"], ["UPBIT_SECRET_KEY", "업비트 Secret Key", "upbit"],
+  ["DEEPSEEK_API_KEY", "DeepSeek API 키", "deepseek"], ["ANTHROPIC_API_KEY", "Claude API 키 (선택)", "anthropic"], ["TG_TOKEN", "텔레그램 봇 토큰 (선택)", "telegram"]];
+const PARAMS = [["MAX_CAPITAL_KRW", "운용 금액(원)", "계좌에 돈이 더 있어도 이만큼(+수익)만 써요"], ["TG_CHAT", "텔레그램 chat id", "@userinfobot에게 물어보면 알려줘요"],
+  ["UNIVERSE_SIZE", "감시 코인 수", "거래대금 상위 N개"], ["MAX_POSITIONS", "동시 보유 최대", ""], ["MAX_POSITION_PCT", "코인당 최대 비중", "0.45 = 45%"],
+  ["RISK_HIGH", "확신 높음 1회 위험", "손절 시 잃는 비율 · 0.03 = 3%"], ["RISK_NORMAL", "확신 보통 1회 위험", "0.015 = 1.5%"],
+  ["DAILY_LOSS_LIMIT", "하루 손실 한도", "0.08 = −8%면 그날 진입 중지"], ["TOTAL_STOP_DD", "누적 손실 정지", "0.25 = −25%면 봇 정지"],
+  ["TRAIL_ATR", "트레일링 폭", "1시간 ATR 배수 · 클수록 오래 버팀"]];
+let formBuilt = false;
+function buildForms() {
+  const kf = $("keyForm"), pf = $("paramForm"); kf.replaceChildren(); pf.replaceChildren();
+  KEYS.forEach(([k, label]) => kf.append(el("div", { class: "field" }, el("label", { for: "f_" + k }, label, " ", el("span", { id: "s_" + k })),
+    el("input", { id: "f_" + k, type: "password", autocomplete: "off", spellcheck: "false" }))));
+  PARAMS.forEach(([k, label, hint]) => pf.append(el("div", { class: "field" }, el("label", { for: "f_" + k, text: label }),
+    el("input", { id: "f_" + k, type: "text", inputmode: k === "TG_CHAT" ? "numeric" : "decimal" }), hint ? el("div", { class: "hint", text: hint }) : null)));
+  pf.append(el("div", { class: "field" }, el("label", { for: "f_DEEPSEEK_THINKING", text: "DeepSeek 생각 모드" }),
+    el("select", { id: "f_DEEPSEEK_THINKING" }, el("option", { value: "disabled", text: "끔(빠르고 쌈 · 권장)" }), el("option", { value: "enabled", text: "켬(판단↑ · 비용 3~4배)" }))));
+  pf.append(el("div", { class: "field" }, el("label", { for: "f_EVOLVE_ENABLED", text: "월 1회 자가진화" }),
+    el("select", { id: "f_EVOLVE_ENABLED" }, el("option", { value: "1", text: "켬" }), el("option", { value: "0", text: "끔" }))));
+  formBuilt = true;
+}
+function renderSettings() {
+  if (!formBuilt) buildForms();
+  KEYS.forEach(([k, , grp]) => {
+    const set = S.settings.keys[grp], s = $("s_" + k);
+    s.className = set ? "set" : "unset"; s.textContent = set ? "· 설정됨" : "· 없음";
+    $("f_" + k).placeholder = set ? "바꿀 때만 입력" : "입력하세요";
+  });
+  if (document.activeElement && document.activeElement.closest && document.activeElement.closest("#paramForm")) return;
+  PARAMS.forEach(([k]) => { const f = $("f_" + k); if (!f.dataset.dirty) f.value = S.settings.values[k] ?? ""; });
+  ["DEEPSEEK_THINKING", "EVOLVE_ENABLED"].forEach((k) => { const f = $("f_" + k); if (!f.dataset.dirty) f.value = String(S.settings.values[k]); });
+}
+document.addEventListener("input", (e) => { if (e.target.closest && e.target.closest("#paramForm")) e.target.dataset.dirty = "1"; });
+$("btnSave").addEventListener("click", async () => {
+  const body = {};
+  KEYS.forEach(([k]) => { const v = $("f_" + k).value.trim(); if (v) body[k] = v; });
+  PARAMS.forEach(([k]) => { body[k] = $("f_" + k).value.trim(); });
+  body.DEEPSEEK_THINKING = $("f_DEEPSEEK_THINKING").value; body.EVOLVE_ENABLED = $("f_EVOLVE_ENABLED").value;
+  const b = $("btnSave"); b.disabled = true; b.textContent = "저장 중…";
+  const r = await act("settings", body);
+  b.disabled = false; b.textContent = "저장하고 적용";
+  if (r && r.ok) { KEYS.forEach(([k]) => { $("f_" + k).value = ""; }); document.querySelectorAll("#paramForm [data-dirty]").forEach((f) => delete f.dataset.dirty); }
+});
+$("btnCheck").addEventListener("click", async () => {
+  const b = $("btnCheck"), out = $("checkOut"); b.disabled = true; b.textContent = "점검 중… (30초~1분)"; out.replaceChildren();
+  const r = await api("/api/check", {});
+  b.disabled = false; b.textContent = "점검 실행";
+  (r.lines || ["실패: " + (r.error || "알 수 없음")]).forEach((l) => out.append(el("li", { text: l })));
+});
+
+// ── 로그 ─────────────────────────────────────────────
+async function loadLogs() {
+  const r = await api("/api/logs"), pre = $("log");
+  const atBottom = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 20;
+  pre.textContent = (r.lines || []).join("\n");
+  if (atBottom) pre.scrollTop = pre.scrollHeight;
+}
+
+// ── 갱신 ─────────────────────────────────────────────
+async function refresh() {
+  try {
+    const r = await api("/api/state");
+    if (r.ok === false) { $("statusLabel").textContent = r.error || "연결 오류"; return; }
+    S = r;
+    renderTop(); renderKpis(); renderPositions(); renderMarket(); renderTrades(); renderDecisions(); renderSettings();
+  } catch (e) {
+    $("statusDot").className = "dot halted"; $("statusLabel").textContent = "프로그램과 연결 끊김";
+  }
+}
+applyTheme(theme);
+refresh().then(loadEquity);
+setInterval(refresh, 5000);
+setInterval(loadEquity, 60000);
+setInterval(() => { if (activeTab === "logs") loadLogs(); }, 5000);
+</script>
+</body>
+</html>

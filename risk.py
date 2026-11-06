@@ -74,6 +74,11 @@ def halted() -> bool:
     return bool(db.get("halted", False))
 
 
+def entries_paused() -> bool:
+    """대시보드의 '신규 진입 일시정지' 버튼(보유분 손절 감시는 계속)."""
+    return bool(db.get("entries_paused", False))
+
+
 def paused_until() -> float:
     return float(db.get("pause_until", 0) or 0)
 
@@ -102,6 +107,8 @@ def entry_size(setup, conviction: str, regime: str, prices: dict, krw_free: floa
     """반환: (주문 금액, 거절 사유). 금액이 0이면 진입하지 않는다."""
     if halted():
         return 0.0, "봇 정지 상태(누적 손실 한도)"
+    if entries_paused():
+        return 0.0, "신규 진입 일시정지(대시보드)"
     if time.time() < paused_until():
         return 0.0, "BTC 급락으로 일시 정지 중"
     s = snapshot(prices)

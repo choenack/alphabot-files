@@ -84,6 +84,8 @@ class Trader:
                     self._exit(**kw)
                 elif cmd == "cancel_buys":
                     self._cancel_entries(kw.get("reason", ""))
+                elif cmd == "cancel_entry":
+                    self._cancel_entry(kw["pid"])
                 if time.time() - self._last_poll >= cfg.ORDER_POLL_SEC:
                     self._last_poll = time.time()
                     self.poll()
@@ -263,6 +265,12 @@ class Trader:
             db.update_position(p["id"], status="open")   # 매도 실패 → 다시 감시
             return
         self._close(p, fi["avg_price"], fi["paid_fee"], fi["executed_volume"], p["exit_reason"] or "stop")
+
+    def _cancel_entry(self, pid: int) -> None:
+        p = db.position(pid)
+        if p and p["status"] == "pending_entry" and p["entry_uuid"] and (p["expires_at"] or 0) > 0:
+            self.ub.cancel(p["entry_uuid"])
+            db.update_position(pid, expires_at=-1)
 
     def _cancel_entries(self, reason: str) -> None:
         n = 0

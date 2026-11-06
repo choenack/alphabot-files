@@ -1,0 +1,52 @@
+# coin-ai.exe 자동 빌드: 이 브랜치(또는 main)에 코드가 올라오면 Windows에서 exe를 만들어
+# 1) Actions 실행 결과의 Artifacts(coin-ai-windows)와
+# 2) Releases의 'coin-ai-latest'(최신 빌드)에 올린다.
+name: build-exe
+
+on:
+  push:
+    branches: ["claude/quirky-shannon-7ftto9", "main"]
+    paths-ignore: ["**.md"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller==6.22.3
+
+      - name: Test
+        run: python -m pytest -q
+
+      - name: Build exe
+        run: pyinstaller --noconfirm --clean --onefile --console --name coin-ai --add-data "dashboard.html;." --add-data ".env.example;." --collect-submodules anthropic main.py
+
+      - name: Smoke test exe
+        run: dist\coin-ai.exe --selftest
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coin-ai-windows
+          path: dist/coin-ai.exe
+
+      - name: Publish 'coin-ai-latest' release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete coin-ai-latest --yes --cleanup-tag || true
+          gh release create coin-ai-latest dist/coin-ai.exe --prerelease \
+            --target "${{ github.sha }}" --title "coin ai (최신 빌드)" \
+            --notes "coin-ai.exe 를 C:\\coin ai 폴더에 넣고 더블클릭하세요. 브라우저에 대시보드가 열리면 설정 탭에서 API 키를 입력합니다. 빌드 커밋: ${{ github.sha }}"
