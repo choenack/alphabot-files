@@ -194,7 +194,7 @@ def detect_setups(market, h1, h4, m15, btc: BtcContext, caution: list) -> list:
 
     # 눌림목 (돌파가 잡혔으면 생략)
     turning = base["mom_15m"] not in ("DOWN", "STRONG_DOWN") and base["rsi_dir"] != "DOWN"
-    if (not out and trend4 == "UP" and e20 > e50 and e50 <= price <= e20 + cfg.PULLBACK_NEAR_EMA_ATR * a
+    if (not out and cfg.PULLBACK_ENABLED and trend4 == "UP" and e20 > e50 and e50 <= price <= e20 + cfg.PULLBACK_NEAR_EMA_ATR * a
             and cfg.PULLBACK_RSI_MIN <= rsi_now <= cfg.PULLBACK_RSI_MAX
             and (turning or not cfg.PULLBACK_REQUIRE_TURN)):
         limit = price - cfg.PULLBACK_ENTRY_ATR * a

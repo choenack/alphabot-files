@@ -34,7 +34,7 @@ PLAIN_KEYS = {
     "TG_CHAT": str, "MAX_CAPITAL_KRW": float, "UNIVERSE_SIZE": int, "MAX_POSITIONS": int,
     "MAX_POSITION_PCT": float, "RISK_HIGH": float, "RISK_NORMAL": float, "DAILY_LOSS_LIMIT": float,
     "TOTAL_STOP_DD": float, "TRAIL_ATR": float, "DEEPSEEK_THINKING": str, "EVOLVE_ENABLED": int,
-    "TG_STATUS_EVERY_MIN": int,
+    "TG_STATUS_EVERY_MIN": int, "REGIME_MULT_DOWN": float, "PULLBACK_ENABLED": int,
 }
 
 

@@ -95,7 +95,7 @@ class Config:
         # ── BTC 상태별 신규 진입 배수 ───────────────────────────
         self.REGIME_MULT_UP = _f("REGIME_MULT_UP", 1.0)
         self.REGIME_MULT_SIDE = _f("REGIME_MULT_SIDE", 0.7)
-        self.REGIME_MULT_DOWN = _f("REGIME_MULT_DOWN", 0.7)       # BTC 하락장: 'BTC와 상관없이 오르는 코인'만, 0.7배 크기
+        self.REGIME_MULT_DOWN = _f("REGIME_MULT_DOWN", 0.0)       # BTC 하락장 신규 진입 배수. 0=안 삼(기본·백테스트상 손해), 0.7=BTC보다 강한 코인만
         self.DOWN_REGIME_MIN_RS = _f("DOWN_REGIME_MIN_RS", 3.0)   # 조건: 24h 상대강도 +3%p 이상
         self.DOWN_REGIME_MIN_RS7 = _f("DOWN_REGIME_MIN_RS7", 0.0)  #       그리고 7일 상대강도도 플러스
         self.KILL_BTC_DROP_1H = _f("KILL_BTC_DROP_1H", 0.03)      # BTC 1시간 고점 대비 -3% → 비상정지
@@ -105,10 +105,10 @@ class Config:
         self.ATR_PERIOD = _i("ATR_PERIOD", 14)                    # 1시간봉 ATR
         self.BREAKOUT_LOOKBACK = _i("BREAKOUT_LOOKBACK", 20)      # 1시간봉 20개 고점 돌파
         self.BREAKOUT_VOL_MULT = _f("BREAKOUT_VOL_MULT", 2.0)     # 최근 1시간 거래량 ≥ 평소 2배
-        self.BREAKOUT_MAX_EXT_ATR = _f("BREAKOUT_MAX_EXT_ATR", 1.5)  # 돌파선보다 1.5ATR 넘게 올라갔으면 추격 안 함
+        self.BREAKOUT_MAX_EXT_ATR = _f("BREAKOUT_MAX_EXT_ATR", 0.8)  # 돌파선보다 0.8ATR 넘게 올라갔으면 추격 안 함
         self.BREAKOUT_STOP_ATR = _f("BREAKOUT_STOP_ATR", 1.0)     # 손절 = 돌파선 - 1ATR
         self.BREAKOUT_TIME_STOP_H = _f("BREAKOUT_TIME_STOP_H", 12)
-        self.BREAKOUT_CONFIRM_1H = _b("BREAKOUT_CONFIRM_1H", False)        # 1시간봉 마감으로 돌파 확인
+        self.BREAKOUT_CONFIRM_1H = _b("BREAKOUT_CONFIRM_1H", True)         # 1시간봉 마감으로 돌파 확인(15분 꼬리 가짜 돌파 거름)
         self.BREAKOUT_REQUIRE_UPTREND = _b("BREAKOUT_REQUIRE_UPTREND", False)  # 4h 추세 UP일 때만 돌파
         self.PULLBACK_RSI_MIN = _f("PULLBACK_RSI_MIN", 38)
         self.PULLBACK_RSI_MAX = _f("PULLBACK_RSI_MAX", 55)
@@ -117,12 +117,13 @@ class Config:
         self.PULLBACK_EXPIRY_MIN = _i("PULLBACK_EXPIRY_MIN", 60)  # 1시간 안에 미체결이면 취소
         self.PULLBACK_STOP_ATR = _f("PULLBACK_STOP_ATR", 2.0)     # 손절 = 진입가 - 2ATR
         self.PULLBACK_TIME_STOP_H = _f("PULLBACK_TIME_STOP_H", 24)
-        self.PULLBACK_REQUIRE_TURN = _b("PULLBACK_REQUIRE_TURN", False)    # 하락이 멈춘 뒤에만 눌림목
+        self.PULLBACK_REQUIRE_TURN = _b("PULLBACK_REQUIRE_TURN", True)     # 하락이 멈춘 뒤에만 눌림목
+        self.PULLBACK_ENABLED = _b("PULLBACK_ENABLED", False)              # 눌림목 셋업(백테스트상 계속 손해라 기본 끔)
         self.SETUP_RECHECK_SEC = _i("SETUP_RECHECK_SEC", 2 * 3600)  # 같은 셋업은 2시간 동안 LLM 재질문 안 함
 
         # ── 매도(코드) ─────────────────────────────────────────
         self.BE_TRIGGER_R = _f("BE_TRIGGER_R", 1.0)               # +1R 오면 손절선을 본전으로
-        self.TRAIL_ATR = _f("TRAIL_ATR", 3.0)                     # 그 뒤 고점 대비 3ATR 빠지면 매도
+        self.TRAIL_ATR = _f("TRAIL_ATR", 2.0)                     # 그 뒤 고점 대비 2ATR 빠지면 매도
 
         # ── 루프 주기 ──────────────────────────────────────────
         self.SCAN_EVERY_MIN = _i("SCAN_EVERY_MIN", 15)            # 15분봉 마감마다 스캔

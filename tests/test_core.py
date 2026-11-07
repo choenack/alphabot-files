@@ -93,10 +93,11 @@ def test_update_stops_breakeven_and_trailing():
     upd, r = update_stops(p, 104)                       # +1R → 본전
     assert upd["be_moved"] == 1 and upd["stop_price"] == pytest.approx(100 * (1 + 2 * cfg.FEE_RATE + 0.001))
     p.update(upd)
-    upd, r = update_stops(p, 110)                       # 고점 110 → 110 - 3*2 = 104
-    assert upd["stop_price"] == pytest.approx(104) and r is None
+    upd, r = update_stops(p, 110)                       # 고점 110 → 110 - TRAIL_ATR × ATR(2)
+    trail = 110 - cfg.TRAIL_ATR * 2
+    assert upd["stop_price"] == pytest.approx(trail) and r is None
     p.update(upd)
-    upd, r = update_stops(p, 103.9)
+    upd, r = update_stops(p, trail - 0.1)
     assert r == "trail"
 
 
@@ -120,7 +121,9 @@ def test_entry_size_caps_and_streak():
     assert size2 == int(cfg.MAX_CAPITAL_KRW * cfg.RISK_NORMAL * 0.5 / 0.04)
 
 
-def test_entry_size_regime_down():
+def test_entry_size_regime_down(monkeypatch):
+    assert risk.entry_size(_setup(rs24=10.0, rs7=5), "high", "DOWN", {}, 1e6)[0] == 0   # 기본: 하락장 신규 진입 안 함
+    monkeypatch.setattr(cfg, "REGIME_MULT_DOWN", 0.7)
     assert risk.entry_size(_setup(rs24=1.0), "high", "DOWN", {}, 1e6)[0] == 0
     assert risk.entry_size(_setup(rs24=4.0, rs7=-2), "high", "DOWN", {}, 1e6)[0] == 0
     assert risk.entry_size(_setup(rs24=4.0, rs7=2, kind="PULLBACK"), "high", "DOWN", {}, 1e6)[0] > 0
@@ -142,7 +145,9 @@ def test_llm_parse_and_sanitize():
 
 
 # ── 셋업 감지 ───────────────────────────────────────────────────────
-def test_detect_breakout():
+def test_detect_breakout(monkeypatch):
+    monkeypatch.setattr(cfg, "BREAKOUT_CONFIRM_1H", False)      # 15분봉 기준 옛 방식
+    monkeypatch.setattr(cfg, "BREAKOUT_MAX_EXT_ATR", 1.5)
     now = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
     h4 = _df(np.linspace(80, 100, 120), now - timedelta(hours=4 * 120), 4)
     base = list(np.linspace(90, 100, 170)) + [100 + 0.3 * np.sin(i) for i in range(30)]
@@ -262,3 +267,19 @@ def test_llm_test_connection_messages(monkeypatch):
     assert lines[0].startswith("✅ DeepSeek 정상")
     assert db.q1("SELECT COUNT(*) n FROM decisions")["n"] == 0          # 판단 기록에는 안 남음
     assert db.q1("SELECT purpose FROM llm_calls")["purpose"] == "test"  # 비용은 기록
+
+
+def test_detect_breakout_needs_1h_close():
+    now = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
+    h4 = _df(np.linspace(80, 100, 120), now - timedelta(hours=4 * 120), 4)
+    base = list(np.linspace(90, 100, 170)) + [100 + 0.3 * np.sin(i) for i in range(29)]
+    m15 = _df([100.4] * 39 + [100.9], now - timedelta(minutes=15 * 40), 0.25, spread=0.002)
+    # 마지막 1시간봉이 고점 아래에서 마감 → 15분봉이 넘어도 돌파 아님
+    h1 = _df(base + [100.2], now - timedelta(hours=200), 1, spread=0.003)
+    h1.loc[h1.index[-1], "volume"] = 300.0
+    assert detect_setups("KRW-TEST", h1, h4, m15, BtcContext("UP", 0.5, 1.0, 0), []) == []
+    # 마지막 1시간봉이 고점 위에서 마감 + 거래량 3배 → 돌파
+    h1 = _df(base + [100.8], now - timedelta(hours=200), 1, spread=0.003)
+    h1.loc[h1.index[-1], "volume"] = 300.0
+    ss = detect_setups("KRW-TEST", h1, h4, m15, BtcContext("UP", 0.5, 1.0, 0), [])
+    assert [s.setup for s in ss] == ["BREAKOUT"]
