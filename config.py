@@ -108,6 +108,8 @@ class Config:
         self.BREAKOUT_MAX_EXT_ATR = _f("BREAKOUT_MAX_EXT_ATR", 1.5)  # 돌파선보다 1.5ATR 넘게 올라갔으면 추격 안 함
         self.BREAKOUT_STOP_ATR = _f("BREAKOUT_STOP_ATR", 1.0)     # 손절 = 돌파선 - 1ATR
         self.BREAKOUT_TIME_STOP_H = _f("BREAKOUT_TIME_STOP_H", 12)
+        self.BREAKOUT_CONFIRM_1H = _b("BREAKOUT_CONFIRM_1H", False)        # 1시간봉 마감으로 돌파 확인
+        self.BREAKOUT_REQUIRE_UPTREND = _b("BREAKOUT_REQUIRE_UPTREND", False)  # 4h 추세 UP일 때만 돌파
         self.PULLBACK_RSI_MIN = _f("PULLBACK_RSI_MIN", 38)
         self.PULLBACK_RSI_MAX = _f("PULLBACK_RSI_MAX", 55)
         self.PULLBACK_NEAR_EMA_ATR = _f("PULLBACK_NEAR_EMA_ATR", 0.25)  # 1h 가격이 EMA20 + 0.25ATR 이하로 내려와야 눌림목
@@ -115,6 +117,7 @@ class Config:
         self.PULLBACK_EXPIRY_MIN = _i("PULLBACK_EXPIRY_MIN", 60)  # 1시간 안에 미체결이면 취소
         self.PULLBACK_STOP_ATR = _f("PULLBACK_STOP_ATR", 2.0)     # 손절 = 진입가 - 2ATR
         self.PULLBACK_TIME_STOP_H = _f("PULLBACK_TIME_STOP_H", 24)
+        self.PULLBACK_REQUIRE_TURN = _b("PULLBACK_REQUIRE_TURN", False)    # 하락이 멈춘 뒤에만 눌림목
         self.SETUP_RECHECK_SEC = _i("SETUP_RECHECK_SEC", 2 * 3600)  # 같은 셋업은 2시간 동안 LLM 재질문 안 함
 
         # ── 매도(코드) ─────────────────────────────────────────

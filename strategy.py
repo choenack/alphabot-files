@@ -174,9 +174,18 @@ def detect_setups(market, h1, h4, m15, btc: BtcContext, caution: list) -> list:
     out = []
 
     # 돌파
-    if (trend4 != "DOWN" and price > hi20 and (price - hi20) <= cfg.BREAKOUT_MAX_EXT_ATR * a
-            and vol_ratio >= cfg.BREAKOUT_VOL_MULT):
-        stop = hi20 - cfg.BREAKOUT_STOP_ATR * a
+    level = hi20
+    if cfg.BREAKOUT_CONFIRM_1H:
+        # 15분봉 꼬리 말고 '마감된 1시간봉'이 그 앞 20개 고점 위에서 끝나야 인정 + 그 1시간 거래량이 평소의 N배
+        level = float(h1["high"].iloc[-lb - 1:-1].max())
+        v_avg = float(h1["volume"].iloc[-lb - 1:-1].mean())
+        brk = (float(close1.iloc[-1]) > level and v_avg > 0
+               and float(h1["volume"].iloc[-1]) / v_avg >= cfg.BREAKOUT_VOL_MULT)
+    else:
+        brk = vol_ratio >= cfg.BREAKOUT_VOL_MULT
+    trend_ok = trend4 == "UP" if cfg.BREAKOUT_REQUIRE_UPTREND else trend4 != "DOWN"
+    if trend_ok and brk and price > level and (price - level) <= cfg.BREAKOUT_MAX_EXT_ATR * a:
+        stop = level - cfg.BREAKOUT_STOP_ATR * a
         sp = (price - stop) / price
         if 0 < sp <= cfg.MAX_STOP_PCT:
             out.append(Setup(market, "BREAKOUT", "market", price, None, stop, sp, a,
@@ -184,8 +193,10 @@ def detect_setups(market, h1, h4, m15, btc: BtcContext, caution: list) -> list:
                              dict(base, setup="BREAKOUT", stop_pct=round(sp * 100, 2))))
 
     # 눌림목 (돌파가 잡혔으면 생략)
+    turning = base["mom_15m"] not in ("DOWN", "STRONG_DOWN") and base["rsi_dir"] != "DOWN"
     if (not out and trend4 == "UP" and e20 > e50 and e50 <= price <= e20 + cfg.PULLBACK_NEAR_EMA_ATR * a
-            and cfg.PULLBACK_RSI_MIN <= rsi_now <= cfg.PULLBACK_RSI_MAX):
+            and cfg.PULLBACK_RSI_MIN <= rsi_now <= cfg.PULLBACK_RSI_MAX
+            and (turning or not cfg.PULLBACK_REQUIRE_TURN)):
         limit = price - cfg.PULLBACK_ENTRY_ATR * a
         stop = limit - cfg.PULLBACK_STOP_ATR * a
         sp = (limit - stop) / limit if limit > 0 else 1
