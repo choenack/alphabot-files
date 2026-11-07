@@ -26,12 +26,16 @@ from logging.handlers import RotatingFileHandler
 import db
 import evolve
 import llm
+import messages
 import notify
 import report
 import risk
 from bot import Bot
 from config import cfg, save_env
-from dashboard import SECRET_KEYS, Dashboard
+from dashboard import Dashboard
+from upbit import Upbit
+
+UPBIT_KEYS = ("UPBIT_ACCESS_KEY", "UPBIT_SECRET_KEY")
 
 log = logging.getLogger("main")
 
@@ -91,42 +95,80 @@ class App:
         self.dash: Dashboard | None = None
 
     # ── 엔진 ────────────────────────────────────────────────────────
-    def start_engine(self, user: bool = False) -> tuple[bool, str]:
+    def start_engine(self, user: bool = False, restarted: bool = False) -> tuple[bool, str]:
         with self.lock:
             if user:
                 self.user_stopped = False
             if self.bot and self.bot.state["running"]:
                 return True, "이미 실행 중"
             self.bot = Bot()
-            ok, msg = self.bot.start()
+            ok, msg = self.bot.start(restarted=restarted)
             self.engine_msg = msg
             (log.info if ok else log.warning)("엔진: %s", msg)
             return ok, msg
 
-    def stop_engine(self, reason: str, user: bool = False) -> None:
+    def stop_engine(self, reason: str, user: bool = False, restarting: bool = False) -> None:
         with self.lock:
             if user:
                 self.user_stopped = True
             if self.bot:
-                self.bot.shutdown(reason)
+                self.bot.shutdown(reason, restarting=restarting)
             self.engine_msg = reason
 
     def restart_engine(self) -> tuple[bool, str]:
-        self.stop_engine("엔진 재시작")
-        return self.start_engine(user=True)
+        """설정 저장·스레드 복구용 재시작: 대기 주문은 그대로, '재시작 완료' 알림 하나만."""
+        with self.lock:
+            self.stop_engine("엔진 재시작", restarting=True)
+            return self.start_engine(user=True, restarted=True)
 
     def apply_settings(self, updates: dict) -> dict:
         if not updates:
             return {"ok": True, "msg": "바뀐 값이 없어요"}
         save_env(updates)
         cfg.reload()
-        keys_changed = any(k in updates for k in SECRET_KEYS)
         msg = f"저장했어요({', '.join(sorted(updates))})"
         running = bool(self.bot and self.bot.state["running"])
-        if keys_changed or not running:
-            ok, emsg = self.restart_engine() if running else self.start_engine(user=True)
+        if running and any(k in updates for k in UPBIT_KEYS):
+            ok, emsg = self.restart_engine()      # 업비트 키는 접속 객체가 들고 있어서 재시작 필요
             msg += f" · 엔진: {emsg}"
+        elif not running:
+            ok, emsg = self.start_engine(user=True)
+            msg += f" · 엔진: {emsg}"
+        else:
+            msg += " · 바로 적용됐어요"          # 텔레그램·LLM 키·숫자 설정은 재시작 없이 반영
         return {"ok": True, "msg": msg}
+
+    # ── 텔레그램 명령 ───────────────────────────────────────────────
+    def _prices(self) -> tuple[dict, float | None]:
+        b = self.bot
+        if b and b.state["running"] and b.state.get("prices"):
+            return b.state["prices"], b.state.get("krw_free")
+        ub = b.ub if b else Upbit()
+        messages.load_names(ub)
+        try:
+            return ub.prices(sorted({p["market"] for p in db.active_positions()} | {"KRW-BTC"})), None
+        except Exception:
+            return {}, None
+
+    def tg_command(self, text: str) -> str:
+        cmd = text.split()[0].split("@")[0].lower()
+        if cmd in ("/status", "/상태", "/s"):
+            prices, krw = self._prices()
+            engine = "" if self.bot and self.bot.state["running"] else "\n⚠️ 매매 엔진이 꺼져 있어요(손절 감시 멈춤)"
+            return messages.status_text(prices, krw) + engine
+        if cmd in ("/today", "/오늘"):
+            return messages.today_text(self._prices()[0])
+        if cmd in ("/report", "/성과"):
+            return report.text(7)
+        if cmd in ("/pause", "/일시정지", "/멈춤"):
+            db.put("entries_paused", True)
+            if self.bot and self.bot.state["running"]:
+                self.bot.trader.submit("cancel_buys", reason="텔레그램 일시정지")
+            return "⏸ 신규 진입을 멈췄어요. 보유 코인의 손절·트레일링 감시는 계속해요. 다시 켜려면 /resume"
+        if cmd in ("/resume", "/재개"):
+            db.put("entries_paused", False)
+            return "▶️ 신규 진입을 다시 켰어요."
+        return messages.help_text()
 
     def run_check(self) -> list[str]:
         b = self.bot if self.bot else Bot()
@@ -167,6 +209,7 @@ class App:
                 webbrowser.open(url)
             return 2
         self.start_engine()
+        notify.start_polling(self.tg_command, self.exit)
         if open_browser and cfg.OPEN_BROWSER:
             webbrowser.open(self.dash.url)
         print(f"\n  대시보드: {self.dash.url}   (이 창을 닫으면 봇이 꺼져요. 끌 때는 대시보드의 '종료' 버튼 권장)\n")

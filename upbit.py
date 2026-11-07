@@ -29,6 +29,10 @@ except Exception:
 from config import cfg
 
 
+# 마켓 한글 이름(KRW-XRP → 리플). 스캐너·알림이 채우고 같이 쓴다.
+MARKET_NAMES: dict[str, str] = {}
+
+
 class UpbitError(Exception):
     def __init__(self, status: int, name: str, message: str):
         super().__init__(f"[{status}] {name}: {message}")

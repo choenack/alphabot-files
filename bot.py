@@ -19,6 +19,7 @@ import requests
 import db
 import evolve
 import llm
+import messages
 import notify
 import report
 import risk
@@ -40,6 +41,7 @@ class Bot:
         self._exit_sent: dict[int, float] = {}
         self._last_kill = 0.0
         self._last_snap = 0.0
+        self._last_status = time.time()   # 시작 알림에 보유 현황이 있으니 첫 정기 알림은 한 주기 뒤
         self.state = {"running": False, "started_at": None, "last_scan": None, "next_scan": None,
                       "btc": None, "universe": [], "setups": [], "krw_free": None, "prices": {}}
 
@@ -126,6 +128,8 @@ class Bot:
             upd, reason = update_stops(p, px)
             if upd:
                 db.update_position(p["id"], **upd)
+                if upd.get("be_moved"):
+                    notify.send(messages.be_text(p, px, upd.get("stop_price", p["stop_price"])))
             if reason and time.time() - self._exit_sent.get(p["id"], 0) > 30:
                 self._exit_sent[p["id"]] = time.time()
                 log.info("청산 신호 %s %s @ %s", p["market"], reason, px)
@@ -137,6 +141,11 @@ class Bot:
         if now - self._last_snap >= 600:
             self._last_snap = now
             self.equity_check(prices)
+        every = cfg.TG_STATUS_EVERY_MIN * 60
+        if every > 0 and now - self._last_status >= every:
+            self._last_status = now
+            if db.positions("open", "pending_entry"):   # 들고 있을 때만(빈손이면 조용히)
+                notify.send(messages.status_text(prices, self.state.get("krw_free")))
 
     def kill_check(self) -> None:
         c = self.ub.candles("KRW-BTC", "minutes/5", 13, closed_only=False)
@@ -168,7 +177,9 @@ class Bot:
         now = datetime.now(risk.KST)
         if now.hour == 23 and now.minute >= 50 and db.get("daily_report_day") != risk.kst_day():
             db.put("daily_report_day", risk.kst_day())
-            notify.send(report.text(7 if now.weekday() == 6 else 1))
+            notify.send(messages.today_text(prices))
+            if now.weekday() == 6:
+                notify.send(report.text(7))
 
     def monitor_loop(self) -> None:
         while not self.stop.is_set():
@@ -200,7 +211,7 @@ class Bot:
             self.stop.wait(3600)
 
     # ── 켜기/끄기 ───────────────────────────────────────────────────
-    def start(self) -> tuple[bool, str]:
+    def start(self, restarted: bool = False) -> tuple[bool, str]:
         if not self.ub.has_keys:
             return False, "업비트 API 키가 없어요 — 설정 탭에서 입력하세요"
         if not cfg.DEEPSEEK_API_KEY and not cfg.ANTHROPIC_API_KEY:
@@ -214,10 +225,14 @@ class Bot:
         except requests.exceptions.RequestException:
             return False, "업비트에 연결할 수 없어요 — 인터넷 연결을 확인하세요"
         self.state["krw_free"] = krw
+        messages.load_names(self.ub)
         self.trader.reconcile()
-        s = risk.snapshot({})
-        notify.send(f"▶️ <b>시작</b> 운용금 {s['allocation']:,.0f}원 · 원화 잔고 {krw:,.0f}원\n"
-                    f"보유/대기 {s['count']}개 · 판단 {cfg.DEEPSEEK_MODEL} · 감시 {cfg.UNIVERSE_SIZE}개")
+        try:
+            prices = self.ub.prices(sorted({p["market"] for p in db.active_positions()} | {"KRW-BTC"}))
+        except Exception:
+            prices = {}
+        self.state["prices"] = prices
+        notify.send(messages.start_text(krw, prices, restarted))
         self.stop.clear()
         self.threads = [threading.Thread(target=self.trader.run, args=(self.stop,), name="trader", daemon=True),
                         threading.Thread(target=self.monitor_loop, name="monitor", daemon=True),
@@ -231,19 +246,23 @@ class Bot:
     def alive(self) -> bool:
         return bool(self.threads) and all(t.is_alive() for t in self.threads)
 
-    def shutdown(self, reason: str = "종료") -> None:
+    def shutdown(self, reason: str = "종료", restarting: bool = False) -> None:
+        """restarting=True(설정 저장 등으로 바로 다시 켜는 경우): 대기 주문은 그대로 두고 알림도 안 보낸다."""
         if not self.state["running"]:
             return
         self.stop.set()
         for t in self.threads:
             t.join(timeout=10)
+        self.state["running"] = False
+        if restarting:
+            return
         try:
             self.trader._cancel_entries(reason)   # 꺼져 있는 동안 체결되지 않게
         except Exception as e:
             log.warning("종료 시 대기 주문 취소 실패: %s", e)
-        self.state["running"] = False
         n = len(db.positions("open"))
-        notify.send(f"⏹ {reason} — 보유 {n}개는 다시 켤 때까지 손절 감시가 멈춥니다" if n else f"⏹ {reason}")
+        notify.send(f"⏹ <b>{reason}</b>\n보유 {n}개 — 다시 켤 때까지 손절 감시가 멈춰요. 가능하면 빨리 다시 켜 주세요."
+                    if n else f"⏹ <b>{reason}</b> (보유 코인 없음)")
 
     # ── 점검(주문 안 함) ────────────────────────────────────────────
     def check(self) -> list[str]:

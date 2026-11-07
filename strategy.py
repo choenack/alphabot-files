@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 import db
 import indicators as ind
 from config import cfg
-from upbit import Upbit
+from upbit import MARKET_NAMES, Upbit
 
 _CAUTION_KO = {
     "PRICE_FLUCTUATIONS": "PRICE_SWING", "TRADING_VOLUME_SOARING": "VOLUME_SOARING",
@@ -64,6 +64,7 @@ class Scanner:
         if not force and self.universe and time.time() - self._universe_ts < cfg.UNIVERSE_REFRESH_SEC:
             return self.universe
         info = {m["market"]: m for m in self.ub.markets() if m["market"].startswith("KRW-")}
+        MARKET_NAMES.update({m: x.get("korean_name") or m for m, x in info.items()})
         caution, blocked = {}, set()
         for m, x in info.items():
             ev = x.get("market_event") or {}

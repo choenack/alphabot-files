@@ -34,6 +34,7 @@ PLAIN_KEYS = {
     "TG_CHAT": str, "MAX_CAPITAL_KRW": float, "UNIVERSE_SIZE": int, "MAX_POSITIONS": int,
     "MAX_POSITION_PCT": float, "RISK_HIGH": float, "RISK_NORMAL": float, "DAILY_LOSS_LIMIT": float,
     "TOTAL_STOP_DD": float, "TRAIL_ATR": float, "DEEPSEEK_THINKING": str, "EVOLVE_ENABLED": int,
+    "TG_STATUS_EVERY_MIN": int,
 }
 
 
@@ -110,6 +111,8 @@ class Dashboard:
                       "ORDER BY closed_at DESC LIMIT 30")
         decisions = db.q("SELECT id, ts, market, setup, action, conviction, reason, model, latency_ms, cost_usd, error, "
                          "is_shadow, prompt_version, fwd_24h FROM decisions ORDER BY ts DESC LIMIT 40")
+        for d in decisions:
+            d["reason_ko"] = llm.reason_ko(d["reason"])
         s7, sall = report.stats(7), report.stats(None)
         month0 = time.mktime(time.localtime()[:2] + (1, 0, 0, 0, 0, 0, -1))
         cost_m = (db.q1("SELECT COALESCE(SUM(cost_usd),0) s FROM llm_calls WHERE ts>=?", (month0,)) or {}).get("s", 0)

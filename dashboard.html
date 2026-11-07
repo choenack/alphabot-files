@@ -590,7 +590,7 @@ function renderDecisions() {
   table($("decTable"), [["시각"], ["코인"], ["셋업"], ["판단"], ["확신"], ["근거"], ["모델"], ["24h 후", 1]],
     S.decisions.map((d) => [dt(d.ts), coin(d.market), SETUP[d.setup] || d.setup,
       el("span", { class: "tag" + (d.action === "ENTER" ? " enter" : ""), text: (d.action === "ENTER" ? "진입" : "패스") + (d.is_shadow ? " · 섀도" : "") }),
-      d.conviction === "high" ? "높음" : "보통", d.error ? "실패: " + d.error.slice(0, 40) : d.reason, (d.model || "").replace("claude-", ""),
+      d.conviction === "high" ? "높음" : "보통", d.error ? "실패: " + d.error.slice(0, 40) : (d.reason_ko || d.reason), (d.model || "").replace("claude-", ""),
       d.fwd_24h != null ? signed(d.fwd_24h, spct(d.fwd_24h, 1)) : el("span", { class: "muted", text: "대기" })]), "아직 판단 기록이 없어요");
   const p = S.prompt, kv = $("promptKv"); kv.replaceChildren();
   const add = (k, v) => kv.append(el("dt", { text: k }), el("dd", { text: v }));
@@ -611,14 +611,15 @@ const PARAMS = [["MAX_CAPITAL_KRW", "운용 금액(원)", "계좌에 돈이 더 
   ["UNIVERSE_SIZE", "감시 코인 수", "거래대금 상위 N개"], ["MAX_POSITIONS", "동시 보유 최대", ""], ["MAX_POSITION_PCT", "코인당 최대 비중", "0.45 = 45%"],
   ["RISK_HIGH", "확신 높음 1회 위험", "손절 시 잃는 비율 · 0.03 = 3%"], ["RISK_NORMAL", "확신 보통 1회 위험", "0.015 = 1.5%"],
   ["DAILY_LOSS_LIMIT", "하루 손실 한도", "0.08 = −8%면 그날 진입 중지"], ["TOTAL_STOP_DD", "누적 손실 정지", "0.25 = −25%면 봇 정지"],
-  ["TRAIL_ATR", "트레일링 폭", "1시간 ATR 배수 · 클수록 오래 버팀"]];
+  ["TRAIL_ATR", "트레일링 폭", "1시간 ATR 배수 · 클수록 오래 버팀"],
+  ["TG_STATUS_EVERY_MIN", "텔레그램 보유 현황 주기(분)", "코인을 들고 있을 때만 보내요 · 0이면 끔"]];
 let formBuilt = false;
 function buildForms() {
   const kf = $("keyForm"), pf = $("paramForm"); kf.replaceChildren(); pf.replaceChildren();
   KEYS.forEach(([k, label]) => kf.append(el("div", { class: "field" }, el("label", { for: "f_" + k }, label, " ", el("span", { id: "s_" + k })),
     el("input", { id: "f_" + k, type: "password", autocomplete: "off", spellcheck: "false" }))));
   PARAMS.forEach(([k, label, hint]) => pf.append(el("div", { class: "field" }, el("label", { for: "f_" + k, text: label }),
-    el("input", { id: "f_" + k, type: "text", inputmode: k === "TG_CHAT" ? "numeric" : "decimal" }), hint ? el("div", { class: "hint", text: hint }) : null)));
+    el("input", { id: "f_" + k, type: "text", inputmode: k === "TG_CHAT" || k === "TG_STATUS_EVERY_MIN" ? "numeric" : "decimal" }), hint ? el("div", { class: "hint", text: hint }) : null)));
   pf.append(el("div", { class: "field" }, el("label", { for: "f_DEEPSEEK_THINKING", text: "DeepSeek 생각 모드" }),
     el("select", { id: "f_DEEPSEEK_THINKING" }, el("option", { value: "disabled", text: "끔(빠르고 쌈 · 권장)" }), el("option", { value: "enabled", text: "켬(판단↑ · 비용 3~4배)" }))));
   pf.append(el("div", { class: "field" }, el("label", { for: "f_EVOLVE_ENABLED", text: "월 1회 자가진화" }),

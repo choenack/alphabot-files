@@ -23,6 +23,18 @@ REASON_VOCAB = [
     "FAKEOUT_RISK", "FALLING_KNIFE", "CAUTION_FLAG", "CHOPPY", "LOSS_HISTORY", "MIXED",
 ]
 _VOCAB = set(REASON_VOCAB)
+REASON_KO = {
+    "BREAKOUT_VOL": "거래량 실린 돌파", "TREND_UP": "상승 추세", "MOMENTUM": "상승 힘이 강함",
+    "RS_STRONG": "BTC보다 강함", "RS_WEAK": "BTC보다 약함", "BTC_UP": "BTC 상승", "BTC_WEAK": "BTC 약세",
+    "PULLBACK_OK": "건강한 눌림", "MACD_UP": "MACD 상승", "MACD_DOWN": "MACD 하락", "EXTENDED": "이미 많이 오름",
+    "WEAK_VOLUME": "거래량 약함", "RSI_HOT": "과열", "FAKEOUT_RISK": "가짜 돌파 위험",
+    "FALLING_KNIFE": "떨어지는 칼날", "CAUTION_FLAG": "업비트 주의 표시", "CHOPPY": "방향 없음",
+    "LOSS_HISTORY": "최근 손실 코인", "MIXED": "신호 혼재",
+}
+
+
+def reason_ko(code: str) -> str:
+    return " · ".join(REASON_KO.get(t, t) for t in re.split(r"[+,/ ]+", code or "") if t) or "—"
 
 DEFAULT_PROMPT = """너는 업비트 원화마켓 코인 '현물 매수 전용' 공격적 단기 추세 트레이더다.
 코드가 이미 셋업(BREAKOUT=돌파 / PULLBACK=상승추세 눌림목)을 찾아 왔다. 너의 일은 이 셋업이 진짜인지 가짜인지 가려서

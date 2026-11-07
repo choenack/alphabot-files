@@ -15,22 +15,13 @@ import time
 import requests
 
 import db
+import messages
 import notify
 import risk
 from config import cfg
 from upbit import Upbit, UpbitError, fill_info
 
 log = logging.getLogger("trader")
-
-
-def fp(x) -> str:
-    """알림용 가격 표기(지수표기 없이)."""
-    x = float(x or 0)
-    if x >= 100:
-        return f"{x:,.0f}"
-    if x >= 1:
-        return f"{x:,.2f}"
-    return f"{x:.6g}"
 
 
 def update_stops(p: dict, price: float, now: float | None = None) -> tuple[dict, str | None]:
@@ -130,9 +121,10 @@ class Trader:
             o = self._send(pid, lambda: self.ub.buy_limit(m, px, vol, ident), ident)
         if o:
             db.update_position(pid, entry_uuid=o["uuid"])
-            kind = "시장가" if setup.entry_type == "market" else f"지정가 {fp(setup.limit_price)}"
-            notify.send(f"🟢 <b>진입 주문</b> {m} [{setup.setup}/{decision['conviction']}]\n"
-                        f"{size:,.0f}원 · {kind} · 손절 -{setup.stop_pct * 100:.1f}%\n근거: {decision.get('reason')}")
+            if setup.entry_type == "limit":   # 시장가는 몇 초 안에 체결되니 '체결' 알림 하나만 보낸다
+                p = db.position(pid)
+                notify.send(messages.limit_wait_text(m, setup.setup, decision["conviction"], decision.get("reason", ""),
+                                                     p["budget_krw"], p["limit_price"], setup.stop_pct))
 
     def _send(self, pid: int, fn, ident: str):
         """주문 전송. 응답을 못 받았으면 identifier로 실제 접수 여부를 확인한다.
@@ -188,11 +180,12 @@ class Trader:
                            exit_reason=reason, pnl_krw=pnl, pnl_r=pnl_r, closed_at=time.time(),
                            note=note or p["note"])
         risk.on_trade_closed(pnl)
-        label = {"stop": "손절", "trail": "트레일링 익절", "time": "시간 손절", "manual": "수동",
-                 "external": "외부 매도"}.get(reason, reason)
-        icon = "🔴" if pnl < 0 else "🔵"
-        notify.send(f"{icon} <b>청산</b> {p['market']} [{label}]\n"
-                    f"{pnl:+,.0f}원 ({pnl_r:+.2f}R) · 진입 {fp(p['entry_price'])} → {fp(exit_price)}")
+        try:
+            held = [x["market"] for x in db.positions("open", "pending_exit")]
+            prices = self.ub.prices(held) if held else {}
+        except Exception:
+            prices = {}
+        notify.send(messages.exit_text(p, exit_price, pnl, pnl_r, reason, prices))
 
     # ── 체결 확인 ───────────────────────────────────────────────────
     def poll(self) -> None:
@@ -226,6 +219,7 @@ class Trader:
                                    note="미체결 취소" if p["entry_type"] == "limit" else "체결 없음")
                 if p["entry_type"] == "limit":
                     log.info("지정가 미체결 취소 %s", p["market"])
+                    notify.send(messages.limit_cancel_text(p))
             return
         exp = p["expires_at"]
         if p["entry_type"] == "limit" and exp and exp > 0 and time.time() > exp:
@@ -245,8 +239,7 @@ class Trader:
             p2 = db.position(p["id"])
             self._close(p2, entry, 0.0, 0.0, "dust", note="일부만 체결돼 최소 주문 금액 미만 — 계좌에 남김")
             return
-        notify.send(f"✅ <b>체결</b> {p['market']} {qty * entry:,.0f}원 @ {fp(entry)}\n"
-                    f"손절 {fp(stop)} (-{(entry - stop) / entry * 100:.1f}%)")
+        notify.send(messages.fill_text(db.position(p["id"])))
 
     def _poll_exit(self, p: dict) -> None:
         try:

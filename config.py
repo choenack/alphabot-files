@@ -158,6 +158,8 @@ class Config:
         self.QUOTE_MAX_PER_SEC = _i("QUOTE_MAX_PER_SEC", 8)       # 공개 API 초당 10회 → 여유 8
         self.EXCHANGE_MAX_PER_SEC = _i("EXCHANGE_MAX_PER_SEC", 6)  # 주문 API 초당 8회 → 여유 6
         self.NOTIFY_ERRORS = _b("NOTIFY_ERRORS", True)
+        self.TG_STATUS_EVERY_MIN = _i("TG_STATUS_EVERY_MIN", 60)   # 코인 보유 중 텔레그램 보유 현황 주기(분), 0=끔
+        self.TG_COMMANDS = _b("TG_COMMANDS", True)                 # 텔레그램 /status 같은 명령 받기
 
         # ── 대시보드 ───────────────────────────────────────────
         self.DASHBOARD_HOST = _s("DASHBOARD_HOST", "127.0.0.1")    # 0.0.0.0 = 같은 와이파이의 휴대폰에서도 접속(비밀번호 필수)
