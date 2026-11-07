@@ -648,9 +648,9 @@ document.addEventListener("change", (e) => { if (e.target.closest && e.target.cl
 $("btnSave").addEventListener("click", async () => {
   const body = {};
   KEYS.forEach(([k]) => { const v = $("f_" + k).value.trim(); if (v) body[k] = v; });
-  PARAMS.forEach(([k]) => { body[k] = $("f_" + k).value.trim(); });
-  body.DEEPSEEK_THINKING = $("f_DEEPSEEK_THINKING").value; body.EVOLVE_ENABLED = $("f_EVOLVE_ENABLED").value;
-  body.REGIME_MULT_DOWN = $("f_REGIME_MULT_DOWN").value; body.PULLBACK_ENABLED = $("f_PULLBACK_ENABLED").value;
+  // 바꾼 칸만 보낸다(안 건드린 값은 .env에 고정하지 않아서 나중에 기본값이 개선되면 그대로 따라감)
+  PARAMS.forEach(([k]) => { const f = $("f_" + k); if (f.dataset.dirty) body[k] = f.value.trim(); });
+  ["DEEPSEEK_THINKING", "EVOLVE_ENABLED", "REGIME_MULT_DOWN", "PULLBACK_ENABLED"].forEach((k) => { const f = $("f_" + k); if (f.dataset.dirty) body[k] = f.value; });
   const b = $("btnSave"); b.disabled = true; b.textContent = "저장 중…";
   const r = await act("settings", body);
   b.disabled = false; b.textContent = "저장하고 적용";
