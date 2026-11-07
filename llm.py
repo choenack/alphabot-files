@@ -233,3 +233,58 @@ def judge(setup, prompt_version: int, prompt_text: str, shadow: bool = False) ->
         latency_ms=int((time.time() - t0) * 1000), cost_usd=round(cost, 6),
         error=None if res else (err or "판단 실패"))
     return dict(out, decision_id=did, ok=res is not None, error=err if res is None else "")
+
+
+# ── 연결 테스트(대시보드 버튼) ───────────────────────────────────────
+_TEST_FEATURES = {
+    "market": "KRW-TEST", "setup": "BREAKOUT", "trend_4h": "UP", "btc_regime": "UP", "btc_24h_pct": 1.2,
+    "bb_pos_1h": 104, "dist_high20_pct": 0.8, "dist_low20_pct": 9.5, "rsi_1h": 64.0, "rsi_dir": "UP",
+    "macd_1h": "CROSS_UP", "vol_ratio_1h": 2.6, "atr_pct_1h": 1.9, "mom_15m": "UP", "ret_24h_pct": 6.1,
+    "rs_24h": 4.9, "rs_7d": 7.3, "caution": [], "recent_trades": [], "stop_pct": 3.4,
+}
+
+
+def _friendly(err: str) -> str:
+    """에러 문구 → 무엇을 하면 되는지."""
+    e = err or ""
+    if "없음" in e:
+        return e + " — 설정 탭에서 입력하세요"
+    if "401" in e or "authentication" in e.lower():
+        return "키가 틀렸어요 — 키를 다시 복사해서 넣어 주세요"
+    if "402" in e or "balance" in e.lower():
+        return "잔액이 없어요 — 충전이 필요해요"
+    if "403" in e:
+        return "권한이 없어요 — 키 권한이나 계정 상태를 확인하세요"
+    if "429" in e or "한도" in e:
+        return "요청이 너무 많아요 — 잠시 뒤 다시 시도하세요"
+    if "타임아웃" in e:
+        return "응답이 없어요 — 인터넷 연결을 확인하거나 잠시 뒤 다시 시도하세요"
+    if "연결" in e:
+        return "서버에 연결할 수 없어요 — 인터넷·방화벽·백신 설정을 확인하세요"
+    return e
+
+
+def test_connection() -> list[str]:
+    """예시 셋업 하나로 실제 판단을 요청해 본다. 판단 기록(자가진화 재료)에는 남기지 않고 비용만 기록."""
+    system = active_prompt()[1] + OUTPUT_CONTRACT
+    user = "다음 셋업을 판단하고 JSON으로만 답하라.\n" + json.dumps(_TEST_FEATURES, ensure_ascii=False)
+    out = []
+    for name, model, fn, enabled in (("DeepSeek", cfg.DEEPSEEK_MODEL, _deepseek, True),
+                                     ("Claude 예비", cfg.FALLBACK_MODEL, _claude_judge, bool(cfg.ANTHROPIC_API_KEY))):
+        if not enabled:
+            out.append(f"– {name}: 키 없음(선택 사항 — DeepSeek 장애 때만 쓰여요)")
+            continue
+        t0 = time.time()
+        res, err, cost, i_t, o_t = fn(system, user)
+        ms = int((time.time() - t0) * 1000)
+        if cost:
+            db.log_llm("test", model, i_t, o_t, cost)
+        won = cost * cfg.FX_KRW_PER_USD
+        if res:
+            out.append(f"✅ {name} 정상 ({model}) · 응답 {ms / 1000:.1f}초 · 비용 약 {won:.2f}원 · "
+                       f"예시 판단 {res['action']}/{res['conviction']} {res['reason']}")
+        else:
+            out.append(f"❌ {name} 실패: {_friendly(err)}")
+            if err and _friendly(err) != err:
+                out.append(f"   (원래 메시지: {err[:160]})")
+    return out

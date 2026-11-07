@@ -249,3 +249,16 @@ def test_evolve_score():
     assert evolve.score(dict(base, fwd_24h=40.0)) == 3.0
     assert evolve.score(dict(base, action="SKIP")) == 0.0
     assert evolve.score(dict(base, fwd_24h=None)) is None
+
+
+def test_llm_test_connection_messages(monkeypatch):
+    monkeypatch.setattr(cfg, "ANTHROPIC_API_KEY", "")
+    monkeypatch.setattr(llm, "_deepseek", lambda s, u: (None, "DeepSeek HTTP 402: Insufficient Balance", 0.0, 0, 0))
+    lines = llm.test_connection()
+    assert lines[0].startswith("❌ DeepSeek 실패: 잔액이 없어요") and "Claude 예비: 키 없음" in lines[-1]
+    monkeypatch.setattr(llm, "_deepseek", lambda s, u: ({"action": "ENTER", "conviction": "high", "reason": "RS_STRONG"},
+                                                        "", 0.0002, 900, 30))
+    lines = llm.test_connection()
+    assert lines[0].startswith("✅ DeepSeek 정상")
+    assert db.q1("SELECT COUNT(*) n FROM decisions")["n"] == 0          # 판단 기록에는 안 남음
+    assert db.q1("SELECT purpose FROM llm_calls")["purpose"] == "test"  # 비용은 기록

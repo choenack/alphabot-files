@@ -97,3 +97,10 @@ def test_save_env_keeps_comments(tmp_path):
     config.save_env({"UPBIT_ACCESS_KEY": "new", "MAX_POSITIONS": 4, "TG_CHAT": "123"}, path=p)
     assert p.read_text(encoding="utf-8").splitlines() == [
         "# 주석", "UPBIT_ACCESS_KEY=new", "MAX_POSITIONS=4", "OTHER=1", "TG_CHAT=123"]
+
+
+def test_llm_test_action(dash, monkeypatch):
+    import llm
+    monkeypatch.setattr(llm, "test_connection", lambda: ["✅ DeepSeek 정상"])
+    st, body = _req(dash, "POST", "/api/llm_test", {})
+    assert st == 200 and json.loads(body)["lines"] == ["✅ DeepSeek 정상"]

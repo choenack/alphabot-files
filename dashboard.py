@@ -194,6 +194,8 @@ class Dashboard:
             return app.apply_settings(self._clean_settings(body))
         if name == "check":
             return {"ok": True, "lines": app.run_check()}
+        if name == "llm_test":
+            return {"ok": True, "lines": llm.test_connection()}
         if name == "evolve":
             return app.start_evolve()
         if name == "shutdown":

@@ -270,8 +270,12 @@ pre.log { margin: 0; max-height: 65vh; overflow: auto; font: 12px/1.55 ui-monosp
       <div><button class="btn primary" id="btnSave" type="button">저장하고 적용</button></div>
       <div class="card">
         <h2>점검</h2>
-        <p class="sub">키·IP·잔고·감시 대상·셋업·LLM 연결을 확인해요(주문 안 함, LLM 1회 호출)</p>
-        <button class="btn" id="btnCheck" type="button">점검 실행</button>
+        <p class="sub">LLM 연결 테스트: 예시 셋업으로 DeepSeek·Claude 키가 실제로 되는지 확인(몇 초, 1원 미만, 기록에 안 남음)<br>
+          전체 점검: 키·IP·잔고·감시 대상·셋업을 확인(주문 안 함)</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn primary" id="btnLlmTest" type="button">LLM 연결 테스트</button>
+          <button class="btn" id="btnCheck" type="button">전체 점검</button>
+        </div>
         <ul class="lines" id="checkOut"></ul>
       </div>
     </div>
@@ -643,10 +647,17 @@ $("btnSave").addEventListener("click", async () => {
   b.disabled = false; b.textContent = "저장하고 적용";
   if (r && r.ok) { KEYS.forEach(([k]) => { $("f_" + k).value = ""; }); document.querySelectorAll("#paramForm [data-dirty]").forEach((f) => delete f.dataset.dirty); }
 });
+$("btnLlmTest").addEventListener("click", async () => {
+  const b = $("btnLlmTest"), out = $("checkOut"); b.disabled = true; b.textContent = "테스트 중… (몇 초)"; out.replaceChildren();
+  const r = await api("/api/llm_test", {});
+  b.disabled = false; b.textContent = "LLM 연결 테스트";
+  (r.lines || ["실패: " + (r.error || "알 수 없음")]).forEach((l) => out.append(el("li", { text: l })));
+  refresh();
+});
 $("btnCheck").addEventListener("click", async () => {
   const b = $("btnCheck"), out = $("checkOut"); b.disabled = true; b.textContent = "점검 중… (30초~1분)"; out.replaceChildren();
   const r = await api("/api/check", {});
-  b.disabled = false; b.textContent = "점검 실행";
+  b.disabled = false; b.textContent = "전체 점검";
   (r.lines || ["실패: " + (r.error || "알 수 없음")]).forEach((l) => out.append(el("li", { text: l })));
 });
 
